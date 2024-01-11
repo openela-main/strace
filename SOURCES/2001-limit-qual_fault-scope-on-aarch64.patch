@@ -1,0 +1,59 @@
+Index: strace-5.17/tests/qual_fault.test
+===================================================================
+--- strace-5.17.orig/tests/qual_fault.test	2022-06-09 15:47:28.871554186 +0200
++++ strace-5.17/tests/qual_fault.test	2022-06-09 15:50:50.016108370 +0200
+@@ -83,19 +83,36 @@
+ 	done
+ }
+ 
+-for err in '' ENOSYS 22 einval; do
++case "$STRACE_ARCH" in
++	aarch64)
++	ERRS='EnoSys 22'
++	NUMBERS1='2'
++	NUMBERS2='3'
++	NUMBERS3='5'
++	NUMBERS4='7'
++	;;
++	*)
++	ERRS='ENOSYS 22 einval'
++	NUMBERS1='1 2 3 7'
++	NUMBERS2='1 2 5 11'
++	NUMBERS3='1 2 3 7'
++	NUMBERS4='1 2 7 11'
++	;;
++esac
++
++for err in '' $(echo $ERRS); do
+ 	for fault in writev desc,51; do
+ 		check_fault_injection \
+ 			writev $fault "$err" '' '' '' 1 -efault=chdir
+ 		check_fault_injection \
+ 			writev $fault "$err" '' '' '' 1 -efault=chdir -efault=none
+-		for F in 1 2 3 7; do
++		for F in $(echo $NUMBERS1); do
+ 			check_fault_injection \
+ 				writev $fault "$err" $F '' '' 1
+ 			check_fault_injection \
+ 				writev $fault "$err" $F '' + 1
+ 
+-			for L in 1 2 5 11; do
++			for L in $(echo $NUMBERS2); do
+ 				[ "$L" -ge "$F" ] ||
+ 					continue
+ 				check_fault_injection \
+@@ -104,12 +121,12 @@
+ 					writev $fault "$err" $F $L + 1
+ 			done
+ 
+-			for S in 1 2 3 7; do
++			for S in $(echo $NUMBERS3); do
+ 				check_fault_injection \
+ 					writev $fault "$err" $F '' $S 1
+ 				check_fault_injection \
+ 					writev $fault "$err" $F '' $S 4
+-				for L in 1 2 7 11; do
++				for L in $(echo $NUMBERS4); do
+ 					[ "$L" -ge "$F" ] ||
+ 						continue
+ 					check_fault_injection \
