@@ -1,0 +1,129 @@
+From 3bf08cbb388a89014252bdfe5143324bdaa4dc46 Mon Sep 17 00:00:00 2001
+From: "Dmitry V. Levin" <ldv@strace.io>
+Date: Mon, 28 Oct 2024 08:00:00 +0000
+Subject: [PATCH 185/185] tests: add another test of restart_syscall decoding
+
+* tests/restart_syscall-p.test: New test.
+* tests/restart_syscall-p.expected: New file.
+* tests/Makefile.am (DECODER_TESTS): Add restart_syscall-p.test.
+(check_DATA): Add restart_syscall-p.expected.
+---
+ tests/Makefile.am                |  2 ++
+ tests/restart_syscall-p.expected |  2 ++
+ tests/restart_syscall-p.test     | 20 ++++++++++++++++++++
+ 3 files changed, 24 insertions(+)
+ create mode 100644 tests/restart_syscall-p.expected
+ create mode 100755 tests/restart_syscall-p.test
+
+Index: strace-5.18/tests/Makefile.am
+===================================================================
+--- strace-5.18.orig/tests/Makefile.am	2022-06-17 13:45:22.000000000 +0200
++++ strace-5.18/tests/Makefile.am	2024-11-01 14:29:01.292879707 +0100
+@@ -499,6 +499,7 @@
+ 	prctl-seccomp-strict.test \
+ 	qual_fault-exit_group.test \
+ 	readv.test \
++	restart_syscall-p.test \
+ 	rt_sigaction.test \
+ 	scm_rights-fd.test \
+ 	seccomp-strict.test \
+@@ -675,6 +676,7 @@
+ 	qualify_personality_empty.in \
+ 	quotactl.h \
+ 	regex.in \
++	restart_syscall-p.expected \
+ 	rt_sigaction.awk \
+ 	run.sh \
+ 	sched.in \
+Index: strace-5.18/tests/restart_syscall-p.expected
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ strace-5.18/tests/restart_syscall-p.expected	2024-11-01 14:29:01.292879707 +0100
+@@ -0,0 +1,2 @@
++restart_syscall(<... resuming interrupted nanosleep ...>) = 0
++exit_group(0) = ?
+Index: strace-5.18/tests/restart_syscall-p.test
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ strace-5.18/tests/restart_syscall-p.test	2024-11-01 14:29:01.292879707 +0100
+@@ -0,0 +1,20 @@
++#!/bin/sh
++#
++# Check restart_syscall decoding.
++#
++# Copyright (c) 2015-2024 The strace developers.
++# All rights reserved.
++#
++# SPDX-License-Identifier: GPL-2.0-or-later
++
++. "${srcdir=.}/init.sh"
++
++run_prog ../sleep 0
++
++../set_ptracer_any ../sleep 2 > /dev/null &
++tracee_pid=$!
++
++../sleep 1
++
++run_strace -qq -a14  -p $tracee_pid
++match_diff
+Index: strace-5.18/tests-m32/Makefile.in
+===================================================================
+--- strace-5.18.orig/tests-m32/Makefile.in	2022-06-18 20:33:58.000000000 +0200
++++ strace-5.18/tests-m32/Makefile.in	2024-11-01 14:29:01.295879673 +0100
+@@ -9232,6 +9232,7 @@
+ 	prctl-seccomp-strict.test \
+ 	qual_fault-exit_group.test \
+ 	readv.test \
++	restart_syscall-p.test \
+ 	rt_sigaction.test \
+ 	scm_rights-fd.test \
+ 	seccomp-strict.test \
+@@ -9403,6 +9404,7 @@
+ 	qualify_personality_empty.in \
+ 	quotactl.h \
+ 	regex.in \
++	restart_syscall-p.expected \
+ 	rt_sigaction.awk \
+ 	run.sh \
+ 	sched.in \
+Index: strace-5.18/tests-mx32/Makefile.in
+===================================================================
+--- strace-5.18.orig/tests-mx32/Makefile.in	2022-06-18 20:33:58.000000000 +0200
++++ strace-5.18/tests-mx32/Makefile.in	2024-11-01 14:29:01.297879650 +0100
+@@ -9232,6 +9232,7 @@
+ 	prctl-seccomp-strict.test \
+ 	qual_fault-exit_group.test \
+ 	readv.test \
++	restart_syscall-p.test \
+ 	rt_sigaction.test \
+ 	scm_rights-fd.test \
+ 	seccomp-strict.test \
+@@ -9403,6 +9404,7 @@
+ 	qualify_personality_empty.in \
+ 	quotactl.h \
+ 	regex.in \
++	restart_syscall-p.expected \
+ 	rt_sigaction.awk \
+ 	run.sh \
+ 	sched.in \
+Index: strace-5.18/tests/Makefile.in
+===================================================================
+--- strace-5.18.orig/tests/Makefile.in	2022-06-18 20:33:59.000000000 +0200
++++ strace-5.18/tests/Makefile.in	2024-11-01 14:29:01.299879628 +0100
+@@ -9231,6 +9231,7 @@
+ 	prctl-seccomp-strict.test \
+ 	qual_fault-exit_group.test \
+ 	readv.test \
++	restart_syscall-p.test \
+ 	rt_sigaction.test \
+ 	scm_rights-fd.test \
+ 	seccomp-strict.test \
+@@ -9402,6 +9403,7 @@
+ 	qualify_personality_empty.in \
+ 	quotactl.h \
+ 	regex.in \
++	restart_syscall-p.expected \
+ 	rt_sigaction.awk \
+ 	run.sh \
+ 	sched.in \

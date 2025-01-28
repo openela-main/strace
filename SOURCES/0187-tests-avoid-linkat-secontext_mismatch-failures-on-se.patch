@@ -1,0 +1,530 @@
+From 660186018897b386fb05d7951aec57a81211a1a4 Mon Sep 17 00:00:00 2001
+From: Eugene Syromyatnikov <evgsyr@gmail.com>
+Date: Wed, 21 Aug 2024 15:32:42 +0200
+Subject: [PATCH] tests: avoid linkat--secontext_mismatch failures on
+ setfilecon errors
+
+linkat--secontext_mismatch can fail if setfilecon cannot update SELinux
+context (for example, that happens when the test is run under
+an unprivileged user and tries to change the type to unconfined_t).
+Avoid it by actually checking the return code and skipping the test
+if there are errors reported by reset_secontext_file
+or update_secontext_field calls.
+
+* tests/secontext.h: Include <errno.h>.
+(reset_secontext_file, update_secontext_field): Change the return type
+from void to int.
+[!(TEST_SECONTEXT && HAVE_SELINUX_RUNTIME)] (reset_secontext_file,
+update_secontext_field): Return -ENOSYS.
+* tests/secontext.c: (reset_secontext_file): Change the return type
+to int;  save the setfilecon return value to ret and reset it to -errno
+if the latter is non-zero;  return ret.
+(update_secontext_field): Change the return type to int;  return -1
+if ctx is NULL;  save the setfilecon return value to ret and reset
+it to -errno if the latter is non-zero;  return ret.
+* tests/linkat.c: Include "xlat.h".
+(secontext_types_data, secontext_types): New constants.
+(mangle_secontext_field): Store the new field value in the new variable;
+store the update_secontext_field return value to the ret variable, error
+and skip if it is non-zero.
+(main): Error and skip if reset_secontext_file returns non-zero.
+
+Reported-by: Edjunior Machado <emachado@redhat.com>
+---
+ tests/linkat.c    | 34 ++++++++++++++++++++++++++++++----
+ tests/secontext.c | 19 ++++++++++++++-----
+ tests/secontext.h | 14 +++++++++-----
+ 3 files changed, 53 insertions(+), 14 deletions(-)
+
+diff --git a/tests/linkat.c b/tests/linkat.c
+index 1d0ee3c9f..832392ca0 100644
+--- a/tests/linkat.c
++++ b/tests/linkat.c
+@@ -19,8 +19,20 @@
+ #include <string.h>
+ 
+ #include "secontext.h"
++#include "xlat.h"
+ #include "xmalloc.h"
+ 
++struct xlat_data secontext_types_data[] = {
++	[SECONTEXT_USER] = XLAT_PAIR(SECONTEXT_USER, "user"),
++	[SECONTEXT_ROLE] = XLAT_PAIR(SECONTEXT_ROLE, "role"),
++	[SECONTEXT_TYPE] = XLAT_PAIR(SECONTEXT_TYPE, "type"),
++};
++struct xlat secontext_types = {
++	.data = secontext_types_data,
++	.size = ARRAY_SIZE(secontext_types_data),
++	.type = XT_INDEXED,
++};
++
+ static void
+ mangle_secontext_field(const char *path, enum secontext_field field,
+ 		       const char *new_val, const char *fallback_val)
+@@ -29,10 +41,18 @@ mangle_secontext_field(const char *path, enum secontext_field field,
+ 	if (!orig)
+ 		return;
+ 
+-	update_secontext_field(path, field,
+-			       strcmp(new_val, orig) ? new_val : fallback_val);
++	const char *new = strcmp(new_val, orig) ? new_val : fallback_val;
+ 
+ 	free(orig);
++
++	int ret = update_secontext_field(path, field, new);
++	if (ret) {
++		error_msg_and_skip("Failed to mangle secontext %s for "
++				   "'%s' to %s: %d",
++				   sprintxval_abbrev(&secontext_types, field,
++						     "SECONTEXT_???"),
++				   path, new, ret);
++	}
+ }
+ 
+ int
+@@ -103,8 +123,14 @@ main(void)
+ 	if (close(fd_sample_2))
+ 		perror_msg_and_fail("close");
+ 
+-	if (*sample_1_secontext && strstr(sample_1_secontext, "!!"))
+-		reset_secontext_file(sample_1);
++	if (*sample_1_secontext && strstr(sample_1_secontext, "!!")) {
++		int ret;
++		if ((ret = reset_secontext_file(sample_1))) {
++			errno = -ret;
++			perror_msg_and_skip("Reset secontext for '%s'",
++					    sample_1);
++		}
++	}
+ 
+ 	free(sample_1_secontext);
+ 
+diff --git a/tests/secontext.c b/tests/secontext.c
+index 84c682869..a0463c467 100644
+--- a/tests/secontext.c
++++ b/tests/secontext.c
+@@ -284,14 +284,19 @@ secontext_short_pid(pid_t pid)
+ 	return FORMAT_SPACE_AFTER(raw_secontext_short_pid(pid));
+ }
+ 
+-void reset_secontext_file(const char *file)
++int
++reset_secontext_file(const char *file)
+ {
+ 	char *proper_ctx = raw_expected_secontext_full_file(file);
+-	(void) setfilecon(file, proper_ctx);
++	int ret = setfilecon(file, proper_ctx);
++	if (ret && errno)
++		ret = -errno;
+ 	free(proper_ctx);
++
++	return ret;
+ }
+ 
+-void
++int
+ update_secontext_field(const char *file, enum secontext_field field,
+ 		       const char *newvalue)
+ {
+@@ -300,7 +305,7 @@ update_secontext_field(const char *file, enum secontext_field field,
+ 
+ 	char *ctx = raw_secontext_full_file(file);
+ 	if (ctx == NULL)
+-		return;
++		return -1;
+ 
+ 	char *saveptr = NULL;
+ 	char *token;
+@@ -319,11 +324,15 @@ update_secontext_field(const char *file, enum secontext_field field,
+ 	char *newcontext = xasprintf("%s:%s:%s:%s", split[0], split[1],
+ 				     split[2], split[3]);
+ 
+-	(void) setfilecon(file, newcontext);
++	int ret = setfilecon(file, newcontext);
++	if (ret && errno)
++		ret = -errno;
+ 
+ 	free(newcontext);
+ 	free(ctx);
+ 	errno = saved_errno;
++
++	return ret;
+ }
+ 
+ #endif /* HAVE_SELINUX_RUNTIME */
+diff --git a/tests/secontext.h b/tests/secontext.h
+index b5bba2272..dab33e6a5 100644
+--- a/tests/secontext.h
++++ b/tests/secontext.h
+@@ -7,6 +7,8 @@
+ 
+ #include "tests.h"
+ #include "xmalloc.h"
++
++#include <errno.h>
+ #include <unistd.h>
+ 
+ char *secontext_full_fd(int) ATTRIBUTE_MALLOC;
+@@ -35,10 +37,10 @@ char *get_secontext_field(const char *full_context, enum secontext_field field);
+ char *get_secontext_field_fd(int fd, enum secontext_field field);
+ char *get_secontext_field_file(const char *file, enum secontext_field field);
+ 
+-void reset_secontext_file(const char *file);
++int reset_secontext_file(const char *file);
+ 
+-void update_secontext_field(const char *file, enum secontext_field field,
+-			    const char *newvalue);
++int update_secontext_field(const char *file, enum secontext_field field,
++			   const char *newvalue);
+ 
+ # ifdef PRINT_SECONTEXT_FULL
+ 
+@@ -81,15 +83,17 @@ get_secontext_field_file(const char *file, enum secontext_field field)
+ 	return NULL;
+ }
+ 
+-static inline void
++static inline int
+ reset_secontext_file(const char *file)
+ {
++	return -ENOSYS;
+ }
+ 
+-static inline void
++static inline int
+ update_secontext_field(const char *file, enum secontext_field field,
+ 		       const char *newvalue)
+ {
++	return -ENOSYS;
+ }
+ 
+ # define SECONTEXT_FD(fd)			xstrdup("")
+diff --git a/tests-m32/linkat.c b/tests-m32/linkat.c
+index 1d0ee3c9f..832392ca0 100644
+--- a/tests-m32/linkat.c
++++ b/tests-m32/linkat.c
+@@ -19,8 +19,20 @@
+ #include <string.h>
+ 
+ #include "secontext.h"
++#include "xlat.h"
+ #include "xmalloc.h"
+ 
++struct xlat_data secontext_types_data[] = {
++	[SECONTEXT_USER] = XLAT_PAIR(SECONTEXT_USER, "user"),
++	[SECONTEXT_ROLE] = XLAT_PAIR(SECONTEXT_ROLE, "role"),
++	[SECONTEXT_TYPE] = XLAT_PAIR(SECONTEXT_TYPE, "type"),
++};
++struct xlat secontext_types = {
++	.data = secontext_types_data,
++	.size = ARRAY_SIZE(secontext_types_data),
++	.type = XT_INDEXED,
++};
++
+ static void
+ mangle_secontext_field(const char *path, enum secontext_field field,
+ 		       const char *new_val, const char *fallback_val)
+@@ -29,10 +41,18 @@ mangle_secontext_field(const char *path, enum secontext_field field,
+ 	if (!orig)
+ 		return;
+ 
+-	update_secontext_field(path, field,
+-			       strcmp(new_val, orig) ? new_val : fallback_val);
++	const char *new = strcmp(new_val, orig) ? new_val : fallback_val;
+ 
+ 	free(orig);
++
++	int ret = update_secontext_field(path, field, new);
++	if (ret) {
++		error_msg_and_skip("Failed to mangle secontext %s for "
++				   "'%s' to %s: %d",
++				   sprintxval_abbrev(&secontext_types, field,
++						     "SECONTEXT_???"),
++				   path, new, ret);
++	}
+ }
+ 
+ int
+@@ -103,8 +123,14 @@ main(void)
+ 	if (close(fd_sample_2))
+ 		perror_msg_and_fail("close");
+ 
+-	if (*sample_1_secontext && strstr(sample_1_secontext, "!!"))
+-		reset_secontext_file(sample_1);
++	if (*sample_1_secontext && strstr(sample_1_secontext, "!!")) {
++		int ret;
++		if ((ret = reset_secontext_file(sample_1))) {
++			errno = -ret;
++			perror_msg_and_skip("Reset secontext for '%s'",
++					    sample_1);
++		}
++	}
+ 
+ 	free(sample_1_secontext);
+ 
+diff --git a/tests-m32/secontext.c b/tests-m32/secontext.c
+index 84c682869..a0463c467 100644
+--- a/tests-m32/secontext.c
++++ b/tests-m32/secontext.c
+@@ -284,14 +284,19 @@ secontext_short_pid(pid_t pid)
+ 	return FORMAT_SPACE_AFTER(raw_secontext_short_pid(pid));
+ }
+ 
+-void reset_secontext_file(const char *file)
++int
++reset_secontext_file(const char *file)
+ {
+ 	char *proper_ctx = raw_expected_secontext_full_file(file);
+-	(void) setfilecon(file, proper_ctx);
++	int ret = setfilecon(file, proper_ctx);
++	if (ret && errno)
++		ret = -errno;
+ 	free(proper_ctx);
++
++	return ret;
+ }
+ 
+-void
++int
+ update_secontext_field(const char *file, enum secontext_field field,
+ 		       const char *newvalue)
+ {
+@@ -300,7 +305,7 @@ update_secontext_field(const char *file, enum secontext_field field,
+ 
+ 	char *ctx = raw_secontext_full_file(file);
+ 	if (ctx == NULL)
+-		return;
++		return -1;
+ 
+ 	char *saveptr = NULL;
+ 	char *token;
+@@ -319,11 +324,15 @@ update_secontext_field(const char *file, enum secontext_field field,
+ 	char *newcontext = xasprintf("%s:%s:%s:%s", split[0], split[1],
+ 				     split[2], split[3]);
+ 
+-	(void) setfilecon(file, newcontext);
++	int ret = setfilecon(file, newcontext);
++	if (ret && errno)
++		ret = -errno;
+ 
+ 	free(newcontext);
+ 	free(ctx);
+ 	errno = saved_errno;
++
++	return ret;
+ }
+ 
+ #endif /* HAVE_SELINUX_RUNTIME */
+diff --git a/tests-m32/secontext.h b/tests-m32/secontext.h
+index b5bba2272..dab33e6a5 100644
+--- a/tests-m32/secontext.h
++++ b/tests-m32/secontext.h
+@@ -7,6 +7,8 @@
+ 
+ #include "tests.h"
+ #include "xmalloc.h"
++
++#include <errno.h>
+ #include <unistd.h>
+ 
+ char *secontext_full_fd(int) ATTRIBUTE_MALLOC;
+@@ -35,10 +37,10 @@ char *get_secontext_field(const char *full_context, enum secontext_field field);
+ char *get_secontext_field_fd(int fd, enum secontext_field field);
+ char *get_secontext_field_file(const char *file, enum secontext_field field);
+ 
+-void reset_secontext_file(const char *file);
++int reset_secontext_file(const char *file);
+ 
+-void update_secontext_field(const char *file, enum secontext_field field,
+-			    const char *newvalue);
++int update_secontext_field(const char *file, enum secontext_field field,
++			   const char *newvalue);
+ 
+ # ifdef PRINT_SECONTEXT_FULL
+ 
+@@ -81,15 +83,17 @@ get_secontext_field_file(const char *file, enum secontext_field field)
+ 	return NULL;
+ }
+ 
+-static inline void
++static inline int
+ reset_secontext_file(const char *file)
+ {
++	return -ENOSYS;
+ }
+ 
+-static inline void
++static inline int
+ update_secontext_field(const char *file, enum secontext_field field,
+ 		       const char *newvalue)
+ {
++	return -ENOSYS;
+ }
+ 
+ # define SECONTEXT_FD(fd)			xstrdup("")
+diff --git a/tests-mx32/linkat.c b/tests-mx32/linkat.c
+index 1d0ee3c9f..832392ca0 100644
+--- a/tests-mx32/linkat.c
++++ b/tests-mx32/linkat.c
+@@ -19,8 +19,20 @@
+ #include <string.h>
+ 
+ #include "secontext.h"
++#include "xlat.h"
+ #include "xmalloc.h"
+ 
++struct xlat_data secontext_types_data[] = {
++	[SECONTEXT_USER] = XLAT_PAIR(SECONTEXT_USER, "user"),
++	[SECONTEXT_ROLE] = XLAT_PAIR(SECONTEXT_ROLE, "role"),
++	[SECONTEXT_TYPE] = XLAT_PAIR(SECONTEXT_TYPE, "type"),
++};
++struct xlat secontext_types = {
++	.data = secontext_types_data,
++	.size = ARRAY_SIZE(secontext_types_data),
++	.type = XT_INDEXED,
++};
++
+ static void
+ mangle_secontext_field(const char *path, enum secontext_field field,
+ 		       const char *new_val, const char *fallback_val)
+@@ -29,10 +41,18 @@ mangle_secontext_field(const char *path, enum secontext_field field,
+ 	if (!orig)
+ 		return;
+ 
+-	update_secontext_field(path, field,
+-			       strcmp(new_val, orig) ? new_val : fallback_val);
++	const char *new = strcmp(new_val, orig) ? new_val : fallback_val;
+ 
+ 	free(orig);
++
++	int ret = update_secontext_field(path, field, new);
++	if (ret) {
++		error_msg_and_skip("Failed to mangle secontext %s for "
++				   "'%s' to %s: %d",
++				   sprintxval_abbrev(&secontext_types, field,
++						     "SECONTEXT_???"),
++				   path, new, ret);
++	}
+ }
+ 
+ int
+@@ -103,8 +123,14 @@ main(void)
+ 	if (close(fd_sample_2))
+ 		perror_msg_and_fail("close");
+ 
+-	if (*sample_1_secontext && strstr(sample_1_secontext, "!!"))
+-		reset_secontext_file(sample_1);
++	if (*sample_1_secontext && strstr(sample_1_secontext, "!!")) {
++		int ret;
++		if ((ret = reset_secontext_file(sample_1))) {
++			errno = -ret;
++			perror_msg_and_skip("Reset secontext for '%s'",
++					    sample_1);
++		}
++	}
+ 
+ 	free(sample_1_secontext);
+ 
+diff --git a/tests-mx32/secontext.c b/tests-mx32/secontext.c
+index 84c682869..a0463c467 100644
+--- a/tests-mx32/secontext.c
++++ b/tests-mx32/secontext.c
+@@ -284,14 +284,19 @@ secontext_short_pid(pid_t pid)
+ 	return FORMAT_SPACE_AFTER(raw_secontext_short_pid(pid));
+ }
+ 
+-void reset_secontext_file(const char *file)
++int
++reset_secontext_file(const char *file)
+ {
+ 	char *proper_ctx = raw_expected_secontext_full_file(file);
+-	(void) setfilecon(file, proper_ctx);
++	int ret = setfilecon(file, proper_ctx);
++	if (ret && errno)
++		ret = -errno;
+ 	free(proper_ctx);
++
++	return ret;
+ }
+ 
+-void
++int
+ update_secontext_field(const char *file, enum secontext_field field,
+ 		       const char *newvalue)
+ {
+@@ -300,7 +305,7 @@ update_secontext_field(const char *file, enum secontext_field field,
+ 
+ 	char *ctx = raw_secontext_full_file(file);
+ 	if (ctx == NULL)
+-		return;
++		return -1;
+ 
+ 	char *saveptr = NULL;
+ 	char *token;
+@@ -319,11 +324,15 @@ update_secontext_field(const char *file, enum secontext_field field,
+ 	char *newcontext = xasprintf("%s:%s:%s:%s", split[0], split[1],
+ 				     split[2], split[3]);
+ 
+-	(void) setfilecon(file, newcontext);
++	int ret = setfilecon(file, newcontext);
++	if (ret && errno)
++		ret = -errno;
+ 
+ 	free(newcontext);
+ 	free(ctx);
+ 	errno = saved_errno;
++
++	return ret;
+ }
+ 
+ #endif /* HAVE_SELINUX_RUNTIME */
+diff --git a/tests-mx32/secontext.h b/tests-mx32/secontext.h
+index b5bba2272..dab33e6a5 100644
+--- a/tests-mx32/secontext.h
++++ b/tests-mx32/secontext.h
+@@ -7,6 +7,8 @@
+ 
+ #include "tests.h"
+ #include "xmalloc.h"
++
++#include <errno.h>
+ #include <unistd.h>
+ 
+ char *secontext_full_fd(int) ATTRIBUTE_MALLOC;
+@@ -35,10 +37,10 @@ char *get_secontext_field(const char *full_context, enum secontext_field field);
+ char *get_secontext_field_fd(int fd, enum secontext_field field);
+ char *get_secontext_field_file(const char *file, enum secontext_field field);
+ 
+-void reset_secontext_file(const char *file);
++int reset_secontext_file(const char *file);
+ 
+-void update_secontext_field(const char *file, enum secontext_field field,
+-			    const char *newvalue);
++int update_secontext_field(const char *file, enum secontext_field field,
++			   const char *newvalue);
+ 
+ # ifdef PRINT_SECONTEXT_FULL
+ 
+@@ -81,15 +83,17 @@ get_secontext_field_file(const char *file, enum secontext_field field)
+ 	return NULL;
+ }
+ 
+-static inline void
++static inline int
+ reset_secontext_file(const char *file)
+ {
++	return -ENOSYS;
+ }
+ 
+-static inline void
++static inline int
+ update_secontext_field(const char *file, enum secontext_field field,
+ 		       const char *newvalue)
+ {
++	return -ENOSYS;
+ }
+ 
+ # define SECONTEXT_FD(fd)			xstrdup("")
+-- 
+2.13.6
+

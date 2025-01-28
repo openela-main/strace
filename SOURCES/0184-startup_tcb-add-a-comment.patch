@@ -1,0 +1,37 @@
+From 2048c136ba6edc4282dbc976c499e038d5b60c03 Mon Sep 17 00:00:00 2001
+From: "Dmitry V. Levin" <ldv@strace.io>
+Date: Mon, 28 Oct 2024 08:00:00 +0000
+Subject: [PATCH 184/185] startup_tcb: add a comment
+
+* src/strace.c (startup_tcb): Add a comment explaining why it is safe
+to call get_scno().
+---
+ src/strace.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/strace.c b/src/strace.c
+index 45ab48c43..1a9d53bc8 100644
+--- a/src/strace.c
++++ b/src/strace.c
+@@ -3549,8 +3549,16 @@ startup_tcb(struct tcb *tcp)
+ 		}
+ 	}
+ 
+-	if ((tcp->flags & TCB_GRABBED) && (get_scno(tcp) == 1))
+-		tcp->s_prev_ent = tcp->s_ent;
++	if (tcp->flags & TCB_GRABBED) {
++		/*
++		 * There is no guarantee the state of the tracee is such that
++		 * would allow get_scno() to obtain meaningful information.
++		 * However, if the tracee is not in a syscall, then the garbage
++		 * obtained by get_scno() is not going to be used.
++		 */
++		if (get_scno(tcp) == 1)
++			tcp->s_prev_ent = tcp->s_ent;
++	}
+ 
+ 	if (cflag) {
+ 		tcp->atime = tcp->stime;
+-- 
+2.13.6
+

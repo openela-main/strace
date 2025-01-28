@@ -1,0 +1,76 @@
+From d08dfdebb381427cbd8565994868926ba9bc4b40 Mon Sep 17 00:00:00 2001
+From: Eugene Syromyatnikov <evgsyr@gmail.com>
+Date: Wed, 30 Oct 2024 15:16:47 +0100
+Subject: [PATCH 188/190] linux/s390/get_scno.c: use NT_S390_SYSTEM_CALL if
+ gprs[2] is clobbered
+
+The way the syscall number is retrieved currently relies on the kernel
+propagating it properly into gprs[2], which is not however always the case;
+apart of the situation where scno > NR_syscalls, there is also an issue
+of inspecting it during syscall restart (as it happens on attach, for
+example), when it is already clobbered by a ERESTART* errno.  Luckily
+for strace, this issue has been already foreseen by the kernel
+developers, and support for retrieving syscall number on s390
+via a separate ptrace regset has been added by the Linux commit
+v3.2-rc1~109^2~34;  13 years later, it is time for it to fulfill
+its purpose and finally get utilised.
+
+* src/linux/s390/get_scno.c (arch_get_scno): Try to retrieve the syscall
+number by querying NT_S390_SYSTEM_CALL regset if gprs[2] contains an errno.
+
+Complements: v6.11-21-gc7e0ea6d712e "syscall: do not use uninitialized parts of struct ptrace_syscall_info"
+---
+ src/linux/s390/get_scno.c | 34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/src/linux/s390/get_scno.c b/src/linux/s390/get_scno.c
+index f0863e26d701..fdc94d025280 100644
+--- a/src/linux/s390/get_scno.c
++++ b/src/linux/s390/get_scno.c
+@@ -9,11 +9,41 @@
+ # define ARCH_REGSET s390_regset
+ #endif
+ 
++#ifndef NT_ARM_SYSTEM_CALL
++# define NT_S390_SYSTEM_CALL 0x307
++#endif
++
+ /* Return codes: 1 - ok, 0 - ignore, other - error. */
+ static int
+ arch_get_scno(struct tcb *tcp)
+ {
+-	tcp->scno = ARCH_REGSET.gprs[2] ?
+-		    ARCH_REGSET.gprs[2] : ARCH_REGSET.gprs[1];
++	typeof(ARCH_REGSET.gprs[2]) gpr2 = ARCH_REGSET.gprs[2];
++
++	if (gpr2 > (typeof(gpr2)) (-4095ULL)) {
++		/*
++		 * We are in restart_syscall and gprs[2] is clobbered
++		 * by the errno, using pulling the syscall number
++		 * via NT_S390_SYSTEM_CALL regset.
++		 */
++		unsigned int scno;
++		const struct iovec io = {
++			.iov_base = &scno,
++			.iov_len = sizeof(scno)
++		};
++		int rc = ptrace(PTRACE_GETREGSET, tcp->pid, NT_S390_SYSTEM_CALL,
++				&io);
++		if (rc && errno != ESRCH) {
++			perror_func_msg("NT_S390_SYSTEM_CALL pid:%d", tcp->pid);
++			return -1;
++		}
++		/*
++		 * The ptrace call returns thread.system_call, that stores raw
++		 * int_code, and the syscall number part is the lowest 16 bits
++		 * of it.
++		 */
++		tcp->scno = scno & 0xffff;
++	} else {
++		tcp->scno = gpr2 ?: ARCH_REGSET.gprs[1];
++	}
+ 	return 1;
+ }
+-- 
+2.28.0
+

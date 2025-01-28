@@ -1,7 +1,7 @@
 Summary: Tracks and displays system calls associated with a running process
 Name: strace
 Version: 5.18
-Release: 2%{?dist}
+Release: 2.1%{?dist}
 # The test suite is GPLv2+, all the rest is LGPLv2.1+.
 License: LGPL-2.1+ and GPL-2.0+
 Group: Development/Debuggers
@@ -280,6 +280,33 @@ Patch181: 0181-secontext-fix-expected-SELinux-context-check-for-unl.patch
 # v5.18-21-g5338636 "tests/bpf: fix sloppy low FD number usage"
 Patch182: 0182-tests-bpf-fix-sloppy-low-FD-number-usage.patch
 
+## https://issues.redhat.com/browse/RHEL-8570
+# v6.11-21-gc7e0ea6d7 "syscall: do not use uninitialized parts of struct ptrace_syscall_info"
+Patch183: 0183-syscall-do-not-use-uninitialized-parts-of-struct-ptr.patch
+# v6.11-22-g2048c136b "startup_tcb: add a comment"
+Patch184: 0184-startup_tcb-add-a-comment.patch
+# v6.11-23-g3bf08cbb3 "tests: add another test of restart_syscall decoding"
+Patch185: 0185-tests-add-another-test-of-restart_syscall-decoding.patch
+
+## kernel-5.14.0-417.el9~9 (RHEL 9.4+) has v6.8-rc1~131^2~223 "tcp: Dump bound-only sockets in inet_diag."
+# v6.9~27 "tests: workaround net-yy-inet* for new kernels"
+Patch186: 0186-tests-workaround-net-yy-inet-for-new-kernels.patch
+## Update linkat--secontext_mismatch test to fix the failures reported by QE
+# v6.11~4 "tests: avoid linkat--secontext_mismatch failures on setfilecon errors"
+Patch187: 0187-tests-avoid-linkat-secontext_mismatch-failures-on-se.patch
+# "linux/s390/get_scno.c: use NT_S390_SYSTEM_CALL if gprs[2] is clobbered"
+Patch188: 0188-linux-s390-get_scno.c-use-NT_S390_SYSTEM_CALL-if-gpr.patch
+### Skip these two patches present in RHEL 9/10 as sockopt-sol_socket test doesn't exist in strace-5.18
+## "tests: move k_setsockopt definition into a separate"
+#Patch189: 0189-tests-move-k_setsockopt-definition-into-a-separate-f.patch
+## "tests/sockopt-timestamp.c: use k_getsockopt and k_setsockopt"
+#Patch190: 0190-tests-sockopt-timestamp.c-use-k_getsockopt-and-k_set.patch
+## Fix for prctl-sve.gen test failure on aarch64
+# v5.19~14 "prctl: improve PR_SVE_[SG]ET_VL decoding"
+Patch191: 0191-prctl-improve-PR_SVE_-SG-ET_VL-decoding.patch
+# v6.3~32 "tests/prctl-sve: fix prctl(PR_SVE_GET_VL) return expected value printing"
+Patch192: 0192-tests-prctl-sve-fix-prctl-PR_SVE_GET_VL-return-expec.patch
+
 ### Wire up rseq and kexec_file_load in order to avoid kexec_file_load
 ### test failure on aarch64. Addresses https://bugzilla.redhat.com/1676045
 ### ("strace: FTBFS in Fedora rawhide/f30").
@@ -448,6 +475,18 @@ received by a process.
 %patch181 -p1
 %patch182 -p1
 
+%patch183 -p1
+%patch184 -p1
+%patch185 -p1
+
+%patch186 -p1
+%patch187 -p1
+%patch188 -p1
+#%patch189 -p1
+#%patch190 -p1
+%patch191 -p1
+%patch192 -p1
+
 #%patch1000 -p1
 #%patch1001 -p1
 
@@ -533,6 +572,11 @@ echo 'END OF TEST SUITE INFORMATION'
 %{_mandir}/man1/*
 
 %changelog
+* Tue Oct 29 2024 Eugene Syromiatnikov <esyr@redhat.com> - 5.18-2.1
+- Fix incorrect syscall name reporting in restart_syscall() on attach when
+  PTRACE_GET_SYSCALL_INFO is in use (RHEL-8570).
+- Update net-yy-inet*, linkat--secontext_mismatch, and prctl-sve tests.
+
 * Mon Jul 11 2022 Eugene Syromiatnikov <esyr@redhat.com> - 5.18-2
 - Fix the issues reported by covscan (#2103068).
 - Fix SELinux context matching for the deleted paths (#2087693).

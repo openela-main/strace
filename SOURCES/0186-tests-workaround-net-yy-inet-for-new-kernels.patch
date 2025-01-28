@@ -1,0 +1,108 @@
+From e9d784ecd3ef0c5af9f8c74a830e797d773d71cb Mon Sep 17 00:00:00 2001
+From: "Dmitry V. Levin" <ldv@strace.io>
+Date: Sun, 21 Apr 2024 08:00:00 +0000
+Subject: [PATCH] tests: workaround net-yy-inet* for new kernels
+
+Starting with Linux kernel commit v6.8-rc1~131^2~223, NETLINK_INET_DIAG
+works also for bound-only sockets.  As there is no easy way to tell
+whether the running kernel contains that commit, the test cannot easily
+predict the kernel behavior in case of sockets in bound-only state.
+Workaround this by skipping the corresponding part of the test.
+
+* tests/net-yy-inet.test: Filter out listen() calls.
+* tests/net-yy-inet.c (main): Do not print expected output for listen()
+syscall.
+
+Resolves: https://github.com/strace/strace/issues/299
+---
+ tests/net-yy-inet.c    | 2 --
+ tests/net-yy-inet.test | 6 +++++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/tests/net-yy-inet.c b/tests/net-yy-inet.c
+index 1a83548bf..7f8e05783 100644
+--- a/tests/net-yy-inet.c
++++ b/tests/net-yy-inet.c
+@@ -63,8 +63,6 @@ main(void)
+ 
+ 	if (listen(listen_fd, 1))
+ 		perror_msg_and_skip("listen");
+-	printf("listen(%d<" TCP_STR ":[%lu]>, 1) = 0\n",
+-	       listen_fd, listen_inode);
+ 
+ 	memset(listen_sa, 0, sizeof(addr));
+ 	*len = sizeof(addr);
+diff --git a/tests/net-yy-inet.test b/tests/net-yy-inet.test
+index 9a3f851bf..d45414bcb 100755
+--- a/tests/net-yy-inet.test
++++ b/tests/net-yy-inet.test
+@@ -17,5 +17,9 @@ run_prog > /dev/null
+ run_strace -a22 -yy -eclose,network $args > "$EXP"
+ 
+ # Filter out close() calls made by ld.so and libc.
+-sed -n '/socket/,$p' < "$LOG" > "$OUT"
++#
++# Filter out listen() call as we cannot easily predict the kernel
++# behaviour because there is no easy way to tell whether the Linux kernel
++# contains commit v6.8-rc1~131^2~223.
++sed -n '/^listen/d;/^socket/,$p' < "$LOG" > "$OUT"
+ match_diff "$OUT" "$EXP"
+diff --git a/tests-m32/net-yy-inet.c b/tests-m32/net-yy-inet.c
+index 1a83548bf..7f8e05783 100644
+--- a/tests-m32/net-yy-inet.c
++++ b/tests-m32/net-yy-inet.c
+@@ -63,8 +63,6 @@ main(void)
+ 
+ 	if (listen(listen_fd, 1))
+ 		perror_msg_and_skip("listen");
+-	printf("listen(%d<" TCP_STR ":[%lu]>, 1) = 0\n",
+-	       listen_fd, listen_inode);
+ 
+ 	memset(listen_sa, 0, sizeof(addr));
+ 	*len = sizeof(addr);
+diff --git a/tests-m32/net-yy-inet.test b/tests-m32/net-yy-inet.test
+index 9a3f851bf..d45414bcb 100755
+--- a/tests-m32/net-yy-inet.test
++++ b/tests-m32/net-yy-inet.test
+@@ -17,5 +17,9 @@ run_prog > /dev/null
+ run_strace -a22 -yy -eclose,network $args > "$EXP"
+ 
+ # Filter out close() calls made by ld.so and libc.
+-sed -n '/socket/,$p' < "$LOG" > "$OUT"
++#
++# Filter out listen() call as we cannot easily predict the kernel
++# behaviour because there is no easy way to tell whether the Linux kernel
++# contains commit v6.8-rc1~131^2~223.
++sed -n '/^listen/d;/^socket/,$p' < "$LOG" > "$OUT"
+ match_diff "$OUT" "$EXP"
+diff --git a/tests-mx32/net-yy-inet.c b/tests-mx32/net-yy-inet.c
+index 1a83548bf..7f8e05783 100644
+--- a/tests-mx32/net-yy-inet.c
++++ b/tests-mx32/net-yy-inet.c
+@@ -63,8 +63,6 @@ main(void)
+ 
+ 	if (listen(listen_fd, 1))
+ 		perror_msg_and_skip("listen");
+-	printf("listen(%d<" TCP_STR ":[%lu]>, 1) = 0\n",
+-	       listen_fd, listen_inode);
+ 
+ 	memset(listen_sa, 0, sizeof(addr));
+ 	*len = sizeof(addr);
+diff --git a/tests-mx32/net-yy-inet.test b/tests-mx32/net-yy-inet.test
+index 9a3f851bf..d45414bcb 100755
+--- a/tests-mx32/net-yy-inet.test
++++ b/tests-mx32/net-yy-inet.test
+@@ -17,5 +17,9 @@ run_prog > /dev/null
+ run_strace -a22 -yy -eclose,network $args > "$EXP"
+ 
+ # Filter out close() calls made by ld.so and libc.
+-sed -n '/socket/,$p' < "$LOG" > "$OUT"
++#
++# Filter out listen() call as we cannot easily predict the kernel
++# behaviour because there is no easy way to tell whether the Linux kernel
++# contains commit v6.8-rc1~131^2~223.
++sed -n '/^listen/d;/^socket/,$p' < "$LOG" > "$OUT"
+ match_diff "$OUT" "$EXP"
+-- 
+2.13.6
+

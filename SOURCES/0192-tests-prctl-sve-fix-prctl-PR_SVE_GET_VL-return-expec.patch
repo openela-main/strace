@@ -1,0 +1,130 @@
+From 3ed268876dd5b65263449f9aeb18a1cc2604c707 Mon Sep 17 00:00:00 2001
+From: Eugene Syromyatnikov <evgsyr@gmail.com>
+Date: Tue, 25 Apr 2023 18:11:21 +0200
+Subject: [PATCH] tests/prctl-sve: fix prctl(PR_SVE_GET_VL) return expected
+ value printing
+
+* tests/prctl-sve.c: Print the expected return value string based
+on the value returned, similarly to the way it is done
+in tests/prctl-sme.c:print_sme_vl_arg().
+
+Fixes: v5.13~8 "tests: improve test coverage of prctl syscall decoder"
+Closes: https://github.com/strace/strace/issues/251
+---
+ tests/prctl-sve.c | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/tests/prctl-sve.c b/tests/prctl-sve.c
+index 4cef149cfec6..216ebfc3f92c 100644
+--- a/tests/prctl-sve.c
++++ b/tests/prctl-sve.c
+@@ -43,12 +43,28 @@ main(void)
+ 		   (unsigned long) 0xff, sprintrc(rc));
+ 
+ 	rc = syscall(__NR_prctl, PR_SVE_GET_VL);
+-	printf("prctl(PR_SVE_GET_VL) = %s", sprintrc(rc));
++	printf("prctl(PR_SVE_GET_VL) = ");
+ 	if (rc >= 0) {
+-		printf(" (PR_SVE_SET_VL_ONEXEC|PR_SVE_VL_INHERIT|%#lx)",
+-			   (unsigned long) 0xff);
++		printf("%#lx", rc);
++		if (rc > 0xffff) {
++			printf(" (");
++			if (rc & PR_SVE_SET_VL_ONEXEC)
++				printf("PR_SVE_SET_VL_ONEXEC");
++			if (rc & PR_SVE_VL_INHERIT) {
++				printf("%sPR_SVE_VL_INHERIT",
++				       rc & PR_SVE_SET_VL_ONEXEC ? "|" : "");
++			}
++			if (rc & ~0x6ffffU) {
++				printf("%s%#lx",
++				       rc & 0x60000 ? "|" : "", rc & ~0x6ffffU);
++			}
++			printf("|%#lx)\n", rc & 0xffffU);
++		} else {
++			puts("");
++		}
++	} else {
++		puts(sprintrc(rc));
+ 	}
+-	puts("");
+ 
+ 	puts("+++ exited with 0 +++");
+ 	return 0;
+diff --git a/tests-m32/prctl-sve.c b/tests-m32/prctl-sve.c
+index 4cef149cfec6..216ebfc3f92c 100644
+--- a/tests-m32/prctl-sve.c
++++ b/tests-m32/prctl-sve.c
+@@ -43,12 +43,28 @@ main(void)
+ 		   (unsigned long) 0xff, sprintrc(rc));
+ 
+ 	rc = syscall(__NR_prctl, PR_SVE_GET_VL);
+-	printf("prctl(PR_SVE_GET_VL) = %s", sprintrc(rc));
++	printf("prctl(PR_SVE_GET_VL) = ");
+ 	if (rc >= 0) {
+-		printf(" (PR_SVE_SET_VL_ONEXEC|PR_SVE_VL_INHERIT|%#lx)",
+-			   (unsigned long) 0xff);
++		printf("%#lx", rc);
++		if (rc > 0xffff) {
++			printf(" (");
++			if (rc & PR_SVE_SET_VL_ONEXEC)
++				printf("PR_SVE_SET_VL_ONEXEC");
++			if (rc & PR_SVE_VL_INHERIT) {
++				printf("%sPR_SVE_VL_INHERIT",
++				       rc & PR_SVE_SET_VL_ONEXEC ? "|" : "");
++			}
++			if (rc & ~0x6ffffU) {
++				printf("%s%#lx",
++				       rc & 0x60000 ? "|" : "", rc & ~0x6ffffU);
++			}
++			printf("|%#lx)\n", rc & 0xffffU);
++		} else {
++			puts("");
++		}
++	} else {
++		puts(sprintrc(rc));
+ 	}
+-	puts("");
+ 
+ 	puts("+++ exited with 0 +++");
+ 	return 0;
+diff --git a/tests-mx32/prctl-sve.c b/tests-mx32/prctl-sve.c
+index 4cef149cfec6..216ebfc3f92c 100644
+--- a/tests-mx32/prctl-sve.c
++++ b/tests-mx32/prctl-sve.c
+@@ -43,12 +43,28 @@ main(void)
+ 		   (unsigned long) 0xff, sprintrc(rc));
+ 
+ 	rc = syscall(__NR_prctl, PR_SVE_GET_VL);
+-	printf("prctl(PR_SVE_GET_VL) = %s", sprintrc(rc));
++	printf("prctl(PR_SVE_GET_VL) = ");
+ 	if (rc >= 0) {
+-		printf(" (PR_SVE_SET_VL_ONEXEC|PR_SVE_VL_INHERIT|%#lx)",
+-			   (unsigned long) 0xff);
++		printf("%#lx", rc);
++		if (rc > 0xffff) {
++			printf(" (");
++			if (rc & PR_SVE_SET_VL_ONEXEC)
++				printf("PR_SVE_SET_VL_ONEXEC");
++			if (rc & PR_SVE_VL_INHERIT) {
++				printf("%sPR_SVE_VL_INHERIT",
++				       rc & PR_SVE_SET_VL_ONEXEC ? "|" : "");
++			}
++			if (rc & ~0x6ffffU) {
++				printf("%s%#lx",
++				       rc & 0x60000 ? "|" : "", rc & ~0x6ffffU);
++			}
++			printf("|%#lx)\n", rc & 0xffffU);
++		} else {
++			puts("");
++		}
++	} else {
++		puts(sprintrc(rc));
+ 	}
+-	puts("");
+ 
+ 	puts("+++ exited with 0 +++");
+ 	return 0;
+-- 
+2.28.0
+
