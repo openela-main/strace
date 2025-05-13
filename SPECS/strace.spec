@@ -1,9 +1,95 @@
 Summary: Tracks and displays system calls associated with a running process
 Name: strace
-Version: 5.18
-Release: 2%{?dist}
-# The test suite is GPLv2+, all the rest is LGPLv2.1+.
-License: LGPL-2.1-or-later and GPL-2.0-or-later
+Version: 6.12
+Release: 1%{?dist}
+# The test suite is GPLv2+, the bundled headers are GPLv2 with Linux syscall
+# exception, all the rest is LGPLv2.1+.
+# https://docs.fedoraproject.org/en-US/legal/license-field/#_no_effective_license_analysis
+# BSD-2-Clause:
+#   bundled/linux/include/uapi/linux/tee.h
+# BSD-3-Clause:
+#   bundled/linux/include/uapi/linux/quota.h
+# GPL-1.0-or-later WITH Linux-syscall-note:
+#   bundled/linux/include/uapi/linux/if_bonding.h
+#   bundled/linux/include/uapi/linux/loop.h
+# GPL-2.0-or-later WITH Linux-syscall-note:
+#   bundled/linux/include/uapi/linux/dm-ioctl.h
+#   bundled/linux/include/uapi/linux/hiddev.h
+#   bundled/linux/include/uapi/linux/if_alg.h
+#   bundled/linux/include/uapi/linux/if_bridge.h
+#   bundled/linux/include/uapi/linux/in6.h
+#   bundled/linux/include/uapi/linux/in.h
+#   bundled/linux/include/uapi/linux/keyctl.h
+#   bundled/linux/include/uapi/linux/mptcp.h
+#   bundled/linux/include/uapi/linux/ptp_clock.h
+#   bundled/linux/include/uapi/linux/tcp.h
+#   bundled/linux/include/uapi/mtd/mtd-abi.h
+#   bundled/linux/include/uapi/mtd/ubi-user.h
+# LGPL-2.0-or-later WITH Linux-syscall-note:
+#   bundled/linux/include/uapi/linux/dm-ioctl.h
+# LGPL-2.1-or-later WITH Linux-syscall-note:
+#   bundled/linux/include/uapi/linux/dqblk_xfs.h
+#   bundled/linux/include/uapi/linux/mqueue.h
+# (GPL-2.0-only WITH Linux-syscall-note) OR Linux-OpenIB:
+#   bundled/linux/include/uapi/linux/tls.h
+#   bundled/linux/include/uapi/rdma/ib_user_verbs.h
+# (GPL-2.0-only WITH Linux-syscall-note) OR MIT:
+#   bundled/linux/include/uapi/linux/io_uring.h
+# (GPL-2.0-or-later WITH Linux-syscall-note) OR BSD-3-Clause:
+#   bundled/linux/include/uapi/linux/v4l2-common.h
+#   bundled/linux/include/uapi/linux/v4l2-controls.h
+#   bundled/linux/include/uapi/linux/videodev2.h
+# GPL-2.0-only WITH Linux-syscall-note:
+#   bundled/linux/include/uapi/asm-generic/hugetlb_encode.h (no explicit license in the file)
+#   bundled/linux/include/uapi/linux/mount.h (no explicit license in the file)
+#   bundled/linux/include/uapi/linux/netfilter/nfnetlink_osf.h (no explicit license in the file)
+#   bundled/linux/include/uapi/linux/version.h (no explicit license in the file)
+#   bundled/linux/include/uapi/asm/hugetlb_encode.h (no explicit license in the file)
+#   the rest of bundled/linux
+# ISC:
+#   bundled/linux/include/uapi/linux/nfc.h
+# X11:
+#   build-aux/install-sh (dist only)
+# LGPL-2.1-or-later:
+#   build-aux/copyright-year-gen
+#   build-aux/file-date-gen
+#   m4/ax_code_coverage.m4
+#   m4/mpers.m4
+#   m4/st_demangle.m4
+#   m4/st_esyscmd_s.m4
+#   m4/st_libdw.m4
+#   m4/st_libunwind.m4
+#   m4/st_save_restore_var.m4
+#   m4/st_selinux.m4
+#   m4/st_stacktrace.m4
+#   m4/st_warn_cflags.m4
+# GPL-2.0-or-later:
+#   build-aux/ar-lib (dist only)
+#   build-aux/compile (dist only)
+#   build-aux/depcomp (dist only)
+#   build-aux/missing (dist only)
+#   build-aux/test-driver (dist only)
+# GPL-3.0-or-later:
+#   build-aux/config.guess (dist only)
+#   build-aux/config.sub (dist only)
+#   build-aux/git-version-gen
+# FSFAP:
+#   README-configure
+#   m4/ax_prog_cc_for_build.m4
+#   m4/ax_valgrind_check.m4
+# FSFUL:
+#   configure (dist only)
+# FSFULLR:
+#   m4/warnings.m4
+# FSFULLRWD:
+#   aclocal.m4 (dist only)
+#   Makefile.in (dist only)
+#   bundled/Makefile.in (dist only)
+#   src/Makefile.in (dist only)
+#   tests/Makefile.in (dist only)
+#   tests-m32/Makefile.in (dist only)
+#   tests-mx32/Makefile.in (dist only)
+License: LGPL-2.1-or-later AND GPL-2.0-or-later AND GPL-3.0-or-later AND BSD-2-Clause AND BSD-3-Clause AND (GPL-1.0-or-later WITH Linux-syscall-note) AND (GPL-2.0-or-later WITH Linux-syscall-note) AND (GPL-2.0-only WITH Linux-syscall-note) AND (LGPL-2.0-or-later WITH Linux-syscall-note) AND (LGPL-2.1-or-later WITH Linux-syscall-note) AND ((GPL-2.0-only WITH Linux-syscall-note) OR Linux-OpenIB) AND ((GPL-2.0-only WITH Linux-syscall-note) OR MIT) AND ((GPL-2.0-or-later WITH Linux-syscall-note) OR BSD-3-Clause) AND ISC AND X11 AND FSFAP AND FSFUL AND FSFULLR AND FSFULLRWD
 # Some distros require Group tag to be present,
 # some require Group tag to be absent,
 # some do not care about Group tag at all,
@@ -68,27 +154,48 @@ BuildRequires: pkgconfig(bluez)
 #Patch173: 0173-tests-secontext-eliminate-separate-secontext_format-.patch
 #Patch174: 0174-tests-linkat-reset-context-to-the-expected-one-if-a-.patch
 
-## https://bugzilla.redhat.com/2103068 covscan fixes
-# v5.18-5-g2bf0696 "src/xlat: remove remnants of unnecessary idx usage in xlookup"
-Patch175: 0175-src-xlat-remove-remnants-of-unnecessary-idx-usage-in.patch
-# v5.18-7-ge604d7b "strauss: tips whitespace and phrasing cleanups"
-Patch176: 0176-strauss-tips-whitespace-and-phrasing-cleanups.patch
-# v5.18-8-g968789d "strauss: fix off-by-one error in strauss array access"
-Patch177: 0177-strauss-fix-off-by-one-error-in-strauss-array-access.patch
-# v5.18-9-g6d3e97e "util: add offs sanity check to print_clock_t"
-Patch178: 0178-util-add-offs-sanity-check-to-print_clock_t.patch
+### https://bugzilla.redhat.com/2103068 covscan fixes
+## v5.18-5-g2bf0696 "src/xlat: remove remnants of unnecessary idx usage in xlookup"
+#Patch175: 0175-src-xlat-remove-remnants-of-unnecessary-idx-usage-in.patch
+## v5.18-7-ge604d7b "strauss: tips whitespace and phrasing cleanups"
+#Patch176: 0176-strauss-tips-whitespace-and-phrasing-cleanups.patch
+## v5.18-8-g968789d "strauss: fix off-by-one error in strauss array access"
+#Patch177: 0177-strauss-fix-off-by-one-error-in-strauss-array-access.patch
+## v5.18-9-g6d3e97e "util: add offs sanity check to print_clock_t"
+#Patch178: 0178-util-add-offs-sanity-check-to-print_clock_t.patch
 
-## https://bugzilla.redhat.com/2087693
-# v5.18-13-g960e78f "secontext: print context of Unix socket's sun_path field"
-Patch179: 0179-secontext-print-context-of-Unix-socket-s-sun_path-fi.patch
-# v5.18-18-g676979f "pathtrace, util: do not print " (deleted)" as part of the path"
-Patch180: 0180-pathtrace-util-do-not-print-deleted-as-part-of-the-p.patch
-# v5.18-19-g3f0e534 "secontext: fix expected SELinux context check for unlinked FDs"
-Patch181: 0181-secontext-fix-expected-SELinux-context-check-for-unl.patch
+### https://bugzilla.redhat.com/2087693
+## v5.18-13-g960e78f "secontext: print context of Unix socket's sun_path field"
+#Patch179: 0179-secontext-print-context-of-Unix-socket-s-sun_path-fi.patch
+## v5.18-18-g676979f "pathtrace, util: do not print " (deleted)" as part of the path"
+#Patch180: 0180-pathtrace-util-do-not-print-deleted-as-part-of-the-p.patch
+## v5.18-19-g3f0e534 "secontext: fix expected SELinux context check for unlinked FDs"
+#Patch181: 0181-secontext-fix-expected-SELinux-context-check-for-unl.patch
 
-## https://bugzilla.redhat.com/2103137
-# v5.18-21-g5338636 "tests/bpf: fix sloppy low FD number usage"
-Patch182: 0182-tests-bpf-fix-sloppy-low-FD-number-usage.patch
+### https://bugzilla.redhat.com/2103137
+## v5.18-21-g5338636 "tests/bpf: fix sloppy low FD number usage"
+#Patch182: 0182-tests-bpf-fix-sloppy-low-FD-number-usage.patch
+
+### https://issues.redhat.com/browse/RHEL-8570
+## v6.11-21-gc7e0ea6d7 "syscall: do not use uninitialized parts of struct ptrace_syscall_info"
+#Patch183: 0183-syscall-do-not-use-uninitialized-parts-of-struct-ptr.patch
+## v6.11-22-g2048c136b "startup_tcb: add a comment"
+#Patch184: 0184-startup_tcb-add-a-comment.patch
+## v6.11-23-g3bf08cbb3 "tests: add another test of restart_syscall decoding"
+#Patch185: 0185-tests-add-another-test-of-restart_syscall-decoding.patch
+
+### kernel-5.14.0-417.el9~9 (RHEL 9.4+) has v6.8-rc1~131^2~223 "tcp: Dump bound-only sockets in inet_diag."
+## v6.9~27 "tests: workaround net-yy-inet* for new kernels"
+#Patch186: 0186-tests-workaround-net-yy-inet-for-new-kernels.patch
+### Update linkat--secontext_mismatch test to fix the failures reported by QE
+## v6.11~4 "tests: avoid linkat--secontext_mismatch failures on setfilecon errors"
+#Patch187: 0187-tests-avoid-linkat-secontext_mismatch-failures-on-se.patch
+## "linux/s390/get_scno.c: use NT_S390_SYSTEM_CALL if gprs[2] is clobbered"
+#Patch188: 0188-linux-s390-get_scno.c-use-NT_S390_SYSTEM_CALL-if-gpr.patch
+## "tests: move k_setsockopt definition into a separate"
+#Patch189: 0189-tests-move-k_setsockopt-definition-into-a-separate-f.patch
+## "tests/sockopt-timestamp.c: use k_getsockopt and k_setsockopt"
+#Patch190: 0190-tests-sockopt-timestamp.c-use-k_getsockopt-and-k_set.patch
 
 # Fallback definitions for make_build/make_install macros
 %{?!__make:       %global __make %_bindir/make}
@@ -126,21 +233,31 @@ received by a process.
 #%patch173 -p1
 #%patch174 -p1
 
-%patch175 -p1
-%patch176 -p1
-%patch177 -p1
-%patch178 -p1
-%patch179 -p1
-%patch180 -p1
-%patch181 -p1
-%patch182 -p1
+#%patch175 -p1
+#%patch176 -p1
+#%patch177 -p1
+#%patch178 -p1
+#%patch179 -p1
+#%patch180 -p1
+#%patch181 -p1
+#%patch182 -p1
+
+#%patch183 -p1
+#%patch184 -p1
+#%patch185 -p1
+
+#%patch186 -p1
+#%patch187 -p1
+#%patch188 -p1
+#%patch189 -p1
+#%patch190 -p1
 
 chmod a+x tests/*.test
 
 echo -n %version-%release > .tarball-version
-echo -n 2022 > .year
-echo -n 2022-06-22 > doc/.strace.1.in.date
-echo -n 2022-06-22 > doc/.strace-log-merge.1.in.date
+echo -n 2024 > .year
+echo -n 2024-02-01 > doc/.strace.1.in.date
+echo -n 2024-02-01 > doc/.strace-log-merge.1.in.date
 
 %build
 echo 'BEGIN OF BUILD ENVIRONMENT INFORMATION'
@@ -151,7 +268,7 @@ file -L /bin/sh
 gcc --version |head -1
 ld --version |head -1
 kver="$(printf '%%s\n%%s\n' '#include <linux/version.h>' 'LINUX_VERSION_CODE' | gcc -E -P -)"
-printf 'kernel-headers %%s.%%s.%%s\n' $(($kver/65536)) $(($kver/256%%256)) $(($kver%%256))
+printf 'kernel-headers %%s.%%s.%%s\n' $((kver/65536)) $((kver/256%%256)) $((kver%%256))
 echo 'END OF BUILD ENVIRONMENT INFORMATION'
 
 CFLAGS="$RPM_OPT_FLAGS $LDFLAGS"
@@ -159,13 +276,13 @@ CFLAGS="$RPM_OPT_FLAGS $LDFLAGS"
 [ "x${CFLAGS#*-m64}" = "x${CFLAGS}" ] || CFLAGS=$(echo "$CFLAGS" | sed 's/-m64//g')
 export CFLAGS
 
-CPPFLAGS="-isystem %{_includedir} %{optflags}"
+CPPFLAGS="%{optflags}"
 # Removing explicit -m64 as it breaks mpers
 [ "x${CPPFLAGS#*-m64}" = "x${CPPFLAGS}" ] || CPPFLAGS=$(echo "$CPPFLAGS" | sed 's/-m64//g')
 export CPPFLAGS
 
 CFLAGS_FOR_BUILD="$RPM_OPT_FLAGS"; export CFLAGS_FOR_BUILD
-%configure --enable-mpers=check
+%configure --enable-mpers=check --enable-bundled=yes
 %make_build
 
 %install
@@ -178,13 +295,21 @@ done
 wait
 
 %check
-%{buildroot}%{_bindir}/strace -V
-%make_build -k check VERBOSE=1
-echo 'BEGIN OF TEST SUITE INFORMATION'
-tail -n 99999 -- tests*/test-suite.log tests*/ksysent.gen.log
-find tests* -type f -name '*.log' -print0 |
-	xargs -r0 grep -H '^KERNEL BUG:' -- ||:
-echo 'END OF TEST SUITE INFORMATION'
+width=$(echo __LONG_WIDTH__ |%__cc -E -P -)
+skip_32bit=0
+%if 0%{?fedora} >= 35 || 0%{?rhel} > 9
+skip_32bit=1
+%endif
+
+if [ "${width}" != 32 ] || [ "${skip_32bit}" != 1 ]; then
+	%{buildroot}%{_bindir}/strace -V
+	%make_build -k check VERBOSE=1
+	echo 'BEGIN OF TEST SUITE INFORMATION'
+	tail -n 99999 -- tests*/test-suite.log tests*/ksysent.gen.log
+	find tests* -type f -name '*.log' -print0 |
+		xargs -r0 grep -H '^KERNEL BUG:' -- ||:
+	echo 'END OF TEST SUITE INFORMATION'
+fi
 
 %files
 %maybe_use_defattr
@@ -194,6 +319,19 @@ echo 'END OF TEST SUITE INFORMATION'
 %{_mandir}/man1/*
 
 %changelog
+* Thu Jan 02 2025 Eugene Syromiatnikov <esyr@redhat.com> - 6.12-1
+- Rebase to v6.12; drop upstream patches on top of 6.7, drop the harcoded
+  "-isystem %{_includedir}" from CPPFLAGS (RHEL-8646).
+
+* Tue Oct 29 2024 Eugene Syromiatnikov <esyr@redhat.com> - 6.7-2
+- Fix incorrect syscall name reporting in restart_syscall() on attach when
+  PTRACE_GET_SYSCALL_INFO is in use (RHEL-65109).
+- Update net-yy-inet* and linkat--secontext_mismatch tests.
+
+* Thu Feb 01 2024 Eugene Syromiatnikov <esyr@redhat.com> - 6.7-1
+- Rebase to v6.7; drop upstream patches on top of 5.18 (RHEL-8646).
+- Updated the SPDX license expression.
+
 * Mon Jul 11 2022 Eugene Syromiatnikov <esyr@redhat.com> - 5.18-2
 - Fix the issues reported by covscan (#2103068).
 - Fix SELinux context matching for the deleted paths (#2087693).
