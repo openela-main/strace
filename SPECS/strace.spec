@@ -1,7 +1,7 @@
 Summary: Tracks and displays system calls associated with a running process
 Name: strace
 Version: 6.12
-Release: 1%{?dist}
+Release: 2%{?dist}
 # The test suite is GPLv2+, the bundled headers are GPLv2 with Linux syscall
 # exception, all the rest is LGPLv2.1+.
 %if 0%{?fedora} >= 35 || 0%{?centos} >= 9 || 0%{?rhel} >= 9
@@ -105,6 +105,12 @@ URL: https://strace.io
 %if 0%{?fedora} >= 12 || 0%{?centos} >= 6 || 0%{?rhel} >= 6 || 0%{?suse_version} >= 1200
 Source: https://strace.io/files/%{version}/strace-%{version}.tar.xz
 
+# Origin: https://github.com/strace/strace/commit/ba41bc0da4b841d9343b7644a3d8c3bd5e3f2780
+Patch0001: 0001-tests-Skip-legacy_syscall_info-on-riscv64-with-kerne.patch
+
+# Origin: https://github.com/strace/strace/commit/189655e7a0603953393057f051ecc71cad3fa42e
+Patch0002: 0002-tests-Reduce-expected-precision-for-relative-timesta.patch
+
 BuildRequires: xz
 %else
 Source: strace-%{version}.tar.gz
@@ -159,6 +165,9 @@ echo -n 2024 > .year
 echo -n 2023-11-21 > doc/.strace.1.in.date
 echo -n 2022-01-01 > doc/.strace-log-merge.1.in.date
 
+%patch 0001 -p1
+%patch 0002 -p1
+
 %build
 echo 'BEGIN OF BUILD ENVIRONMENT INFORMATION'
 uname -a |head -1
@@ -209,6 +218,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Mon May 12 2025 Andrea Bolognani <abologna@redhat.com> - 6.12.2
+- Fix riscv64 build (RHEL-90838)
+
 * Thu Jan 02 2025 Eugene Syromiatnikov <esyr@redhat.com> - 6.12-1
 - Rebase to v6.12; drop upstream patches on top of 6.7 (RHEL-62412).
 
