@@ -1,7 +1,7 @@
 Summary: Tracks and displays system calls associated with a running process
 Name: strace
 Version: 6.12
-Release: 2%{?dist}
+Release: 3%{?dist}
 # The test suite is GPLv2+, the bundled headers are GPLv2 with Linux syscall
 # exception, all the rest is LGPLv2.1+.
 %if 0%{?fedora} >= 35 || 0%{?centos} >= 9 || 0%{?rhel} >= 9
@@ -111,6 +111,9 @@ Patch0001: 0001-tests-Skip-legacy_syscall_info-on-riscv64-with-kerne.patch
 # Origin: https://github.com/strace/strace/commit/189655e7a0603953393057f051ecc71cad3fa42e
 Patch0002: 0002-tests-Reduce-expected-precision-for-relative-timesta.patch
 
+# Origin: https://github.com/strace/strace/commit/1e4f282ba6c1fea8b689aa74affbedddbb799d21
+Patch0003: 0003-tests-group_req-fix-compilation-warnings.patch
+
 BuildRequires: xz
 %else
 Source: strace-%{version}.tar.gz
@@ -167,6 +170,7 @@ echo -n 2022-01-01 > doc/.strace-log-merge.1.in.date
 
 %patch 0001 -p1
 %patch 0002 -p1
+%patch 0003 -p1
 
 %build
 echo 'BEGIN OF BUILD ENVIRONMENT INFORMATION'
@@ -218,6 +222,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Wed Dec 17 2025 Michael Petlan <mpetlan@redhat.com> - 6.12.3
+- Fix incorrect inet_pton call discovered by fortification (RHEL-136502)
+
 * Mon May 12 2025 Andrea Bolognani <abologna@redhat.com> - 6.12.2
 - Fix riscv64 build (RHEL-90838)
 
